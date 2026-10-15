@@ -4,6 +4,8 @@ Human-visible **Tauri desktop** kanban + agent-friendly **CLI**, sharing one SQL
 
 Agents move cards with `board … --json`. People use the native Board window on macOS and Windows.
 
+![Board desktop — kanban with detail panel](docs/images/desktop.png)
+
 Design: Linear-style restraint + Apple HIG surfaces — see [`docs/design-system.md`](docs/design-system.md).
 
 ## Direction
