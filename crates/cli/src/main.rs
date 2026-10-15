@@ -1,3 +1,5 @@
+mod ui_server;
+
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -136,6 +138,13 @@ enum Commands {
     },
     /// Export cards/links/events as JSON
     Export,
+    /// Serve the embedded kanban UI (also works as the bundled desktop surface)
+    Ui {
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 7841)]
+        port: u16,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -157,6 +166,12 @@ impl From<AssigneeCli> for AssigneeKind {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    if let Commands::Ui { host, port } = &cli.command {
+        let rt = tokio::runtime::Runtime::new().context("tokio runtime")?;
+        return rt.block_on(ui_server::run(cli.db.clone(), host, *port));
+    }
+
     let store = match &cli.db {
         Some(p) => BoardStore::open(p).with_context(|| format!("open db {}", p.display()))?,
         None => BoardStore::open_default().context("open default db")?,
@@ -420,6 +435,7 @@ fn main() -> Result<()> {
             let data = store.export_json()?;
             println!("{}", serde_json::to_string_pretty(&data)?);
         }
+        Commands::Ui { .. } => unreachable!("handled before store open"),
     }
 
     Ok(())

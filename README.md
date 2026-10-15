@@ -55,21 +55,41 @@ cargo build -p board --release --target x86_64-pc-windows-gnu
 cargo build -p board --release
 ```
 
-## Desktop app (macOS & Windows)
+## Desktop UI (bundled in the `board` binary)
 
-Requires Node 20+ and Rust. On each OS, build natively (Tauri needs the local WebView):
+The kanban UI is **embedded in the same `board` executable**. No separate Tauri install needed for day-to-day use:
+
+```bash
+board ui
+# → http://127.0.0.1:7841
+```
+
+```powershell
+.\board-windows-x64.exe ui --port 7841
+```
+
+Options: `--host 127.0.0.1` (default), `--port 7841`.
+
+Rebuild the embedded assets after UI changes:
+
+```bash
+./scripts/embed-ui.sh
+cargo build -p board --release
+./scripts/build-windows-cli.sh   # refreshes dist/board-windows-x64.exe
+```
+
+### Optional: native Tauri window (macOS / Windows)
+
+Same UI, as a real desktop window (needs local WebView):
 
 ```bash
 cd apps/desktop
 npm install
-npm run tauri dev          # development
-npm run tauri build        # installers under src-tauri/target/release/bundle/
+npm run tauri dev
+npm run tauri build   # installers under src-tauri/target/release/bundle/
 ```
 
-- **Windows**: produces `.msi` / `.exe` installer (WebView2).
-- **macOS**: produces `.app` / `.dmg`.
-
-The desktop app and CLI share the same default database, so an agent can `board move …` while you watch the board update after Refresh (or reopen detail).
+CLI and UI share the same SQLite DB, so agents can `board move … --json` while you watch the board.
 
 ## Data model (v0)
 

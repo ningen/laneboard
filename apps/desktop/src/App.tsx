@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { api } from "./api";
 import {
   BoardSnapshot,
   Card,
@@ -9,16 +9,6 @@ import {
   Event,
   Status,
 } from "./types";
-
-const isTauri = () =>
-  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
-async function api<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
-  if (!isTauri()) {
-    throw new Error("Open via the Tauri app (npm run tauri dev)");
-  }
-  return invoke<T>(cmd, args);
-}
 
 export default function App() {
   const [board, setBoard] = useState<BoardSnapshot | null>(null);
