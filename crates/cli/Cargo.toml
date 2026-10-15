@@ -1,0 +1,17 @@
+[package]
+name = "board"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI for the agent-friendly kanban board"
+
+[[bin]]
+name = "board"
+path = "src/main.rs"
+
+[dependencies]
+board-core.workspace = true
+anyhow.workspace = true
+clap = { workspace = true, features = ["derive", "env"] }
+serde.workspace = true
+serde_json.workspace = true

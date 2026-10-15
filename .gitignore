@@ -1,0 +1,18 @@
+/target
+**/target
+node_modules
+apps/desktop/dist
+.DS_Store
+*.db
+*.db-shm
+*.db-wal
+.idea
+.vscode
+apps/desktop/src-tauri/gen
+apps/desktop/src-tauri/WixTools
+*.log
+
+# Keep prebuilt Windows CLI; ignore other build junk under dist/
+dist/*
+!dist/board-windows-x64.exe
+!dist/README.md
