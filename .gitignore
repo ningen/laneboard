@@ -11,6 +11,8 @@ apps/desktop/dist
 .vscode
 apps/desktop/src-tauri/gen
 apps/desktop/src-tauri/WixTools
+apps/desktop/src-tauri/icons/android/
+apps/desktop/src-tauri/icons/ios/
 *.log
 
 # Keep prebuilt Windows CLI; ignore other build junk under dist/
