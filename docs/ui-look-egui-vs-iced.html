@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>egui vs iced — look comparison</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #0b0d10;
+      color: #e8eaed;
+      padding: 1.25rem;
+    }
+    h1 { font-size: 1.15rem; margin: 0 0 0.35rem; font-weight: 650; }
+    .lede { color: #9aa3ad; margin: 0 0 1.25rem; font-size: 0.92rem; max-width: 52rem; line-height: 1.45; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+    .pane { display: flex; flex-direction: column; gap: 0.55rem; min-width: 0; }
+    .label {
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9aa3ad;
+      font-weight: 600;
+    }
+    .note { font-size: 0.8rem; color: #8b949e; line-height: 1.4; min-height: 3.2rem; }
+
+    /* —— egui-ish: dense Dear ImGui / tooling look —— */
+    .egui {
+      background: #1b1b1b;
+      border: 1px solid #3a3a3a;
+      border-radius: 4px;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      font-size: 13px;
+      color: #dfdfdf;
+      overflow: hidden;
+    }
+    .egui .bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 4px 6px;
+      background: #242424;
+      border-bottom: 1px solid #3a3a3a;
+    }
+    .egui .bar strong { font-weight: 600; color: #ffe8a3; }
+    .egui .bar input {
+      flex: 1;
+      background: #101010;
+      border: 1px solid #555;
+      color: #ddd;
+      padding: 2px 6px;
+      border-radius: 2px;
+      font: inherit;
+    }
+    .egui .bar button {
+      background: #3a3a3a;
+      border: 1px solid #666;
+      color: #eee;
+      padding: 2px 8px;
+      border-radius: 2px;
+      font: inherit;
+    }
+    .egui .cols {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 4px;
+      min-height: 280px;
+    }
+    .egui .col {
+      background: #222;
+      border: 1px solid #444;
+      padding: 3px;
+    }
+    .egui .col h3 {
+      margin: 0 0 3px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #bbb;
+      background: #2c2c2c;
+      padding: 2px 4px;
+    }
+    .egui .card {
+      background: #2a2a2a;
+      border: 1px solid #555;
+      margin-bottom: 3px;
+      padding: 4px 5px;
+      border-radius: 2px;
+    }
+    .egui .card .k { color: #7ec8ff; font-size: 11px; }
+    .egui .card .t { margin-top: 1px; line-height: 1.25; }
+    .egui .chip {
+      display: inline-block;
+      margin-top: 2px;
+      font-size: 10px;
+      padding: 0 3px;
+      border: 1px solid #666;
+      color: #ccc;
+      background: #333;
+    }
+
+    /* —— iced-ish: airier, toolkit / consumer app —— */
+    .iced {
+      background: #f4f5f7;
+      border: 1px solid #d5d8de;
+      border-radius: 12px;
+      font-family: Inter, "Helvetica Neue", system-ui, sans-serif;
+      font-size: 14px;
+      color: #1f2328;
+      overflow: hidden;
+    }
+    .iced .bar {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 10px 12px;
+      background: #fff;
+      border-bottom: 1px solid #e4e7ec;
+    }
+    .iced .bar strong { font-weight: 700; letter-spacing: -0.02em; }
+    .iced .bar span { color: #6b7280; font-size: 12px; margin-left: 0.25rem; }
+    .iced .bar input {
+      flex: 1;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      color: #111;
+      padding: 7px 10px;
+      border-radius: 8px;
+      font: inherit;
+    }
+    .iced .bar button {
+      background: #2563eb;
+      border: none;
+      color: #fff;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font: inherit;
+      font-weight: 600;
+    }
+    .iced .cols {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      padding: 12px;
+      min-height: 280px;
+      background: #eef0f4;
+    }
+    .iced .col {
+      background: transparent;
+      min-width: 0;
+    }
+    .iced .col h3 {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .iced .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 8px;
+      padding: 10px 11px;
+      border-radius: 10px;
+    }
+    .iced .card .k { color: #2563eb; font-size: 11px; font-weight: 600; }
+    .iced .card .t { margin-top: 4px; line-height: 1.35; font-weight: 560; }
+    .iced .chip {
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      color: #4b5563;
+      background: #f3f4f6;
+    }
+
+    .takeaways {
+      margin-top: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 960px) { .takeaways { grid-template-columns: 1fr; } }
+    .takeaways section {
+      border: 1px solid #2a313a;
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      background: #12161c;
+    }
+    .takeaways h2 { margin: 0 0 0.4rem; font-size: 0.95rem; }
+    .takeaways ul { margin: 0; padding-left: 1.1rem; color: #b7c0ca; font-size: 0.86rem; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <h1>egui vs iced — 看板UIの見た目イメージ</h1>
+  <p class="lede">
+    実ウィジェットではなく「デフォルト寄りの空気感」のモックです。
+    カスタムテーマで寄せられますが、骨格の印象はだいたいこの差のまま残ります。
+  </p>
+
+  <div class="grid">
+    <div class="pane">
+      <div class="label">egui（デフォルト寄り）</div>
+      <p class="note">Dear ImGui 系。密・暗い・ツール画面。ゲームエディタやデバッガに近い。</p>
+      <div class="egui">
+        <div class="bar">
+          <strong>Board</strong>
+          <input value="search…" readonly />
+          <button>Seed</button>
+        </div>
+        <div class="cols">
+          <div class="col">
+            <h3>Backlog</h3>
+            <div class="card"><div class="k">CARD-3</div><div class="t">Card links + timeline</div><span class="chip">core</span></div>
+          </div>
+          <div class="col">
+            <h3>Ready</h3>
+            <div class="card"><div class="k">CARD-2</div><div class="t">Kanban desktop shell</div><span class="chip">human:you</span></div>
+          </div>
+          <div class="col">
+            <h3>Doing</h3>
+            <div class="card"><div class="k">CARD-1</div><div class="t">Define board CLI contract</div><span class="chip">agent:cursor</span></div>
+          </div>
+          <div class="col">
+            <h3>Blocked</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="label">iced（デフォルト寄り）</div>
+      <p class="note">余白あり・角丸・ボタンがアプリっぽい。Flutter / 軽量ネイティブ toolkit に近い。</p>
+      <div class="iced">
+        <div class="bar">
+          <strong>Board</strong><span>human + agent</span>
+          <input value="Search cards…" readonly />
+          <button>Seed</button>
+        </div>
+        <div class="cols">
+          <div class="col">
+            <h3>Backlog</h3>
+            <div class="card"><div class="k">CARD-3</div><div class="t">Card links + timeline</div><span class="chip">core</span></div>
+          </div>
+          <div class="col">
+            <h3>Ready</h3>
+            <div class="card"><div class="k">CARD-2</div><div class="t">Kanban desktop shell</div><span class="chip">human:you</span></div>
+          </div>
+          <div class="col">
+            <h3>Doing</h3>
+            <div class="card"><div class="k">CARD-1</div><div class="t">Define board CLI contract</div><span class="chip">agent:cursor</span></div>
+          </div>
+          <div class="col">
+            <h3>Blocked</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="takeaways">
+    <section>
+      <h2>egui を選ぶとき</h2>
+      <ul>
+        <li>「作業台 / デバッグ盤」感でよい</li>
+        <li>実装を速く、配布を単純にしたい</li>
+        <li>ドラッグ看板は自前だが、密な情報表示は得意</li>
+      </ul>
+    </section>
+    <section>
+      <h2>iced を選ぶとき</h2>
+      <ul>
+        <li>もう少し普通のデスクトップアプリに見せたい</li>
+        <li>テーマ・余白を設計する余力がある</li>
+        <li>それでも Web 版ほどの見た目自由度はない</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>
