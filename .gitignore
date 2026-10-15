@@ -16,4 +16,5 @@ apps/desktop/src-tauri/WixTools
 # Keep prebuilt Windows CLI; ignore other build junk under dist/
 dist/*
 !dist/board-windows-x64.exe
+!dist/board-desktop-linux-x64
 !dist/README.md

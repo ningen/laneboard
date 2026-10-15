@@ -1,0 +1,104 @@
+/**
+ * Board design system
+ * Inspired by Linear (restraint, hierarchy-via-opacity, sparse accent)
+ * and Apple HIG (light surfaces, calm separators, clear type scale).
+ * Accents stay on Apple blue — not indigo/violet — to keep the UI neutral.
+ */
+
+:root {
+  /* Color — light, content-first */
+  --bg: #f5f5f7;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #eef0f3;
+  --bg-hover: rgba(0, 0, 0, 0.03);
+  --bg-active: rgba(0, 0, 0, 0.05);
+
+  --ink: #1d1d1f;
+  --ink-secondary: #6e6e73;
+  --ink-tertiary: #86868b;
+  --ink-quaternary: #a1a1a6;
+
+  --line: rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.12);
+  --line-focus: rgba(0, 113, 227, 0.45);
+
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: rgba(0, 113, 227, 0.08);
+  --accent-ink: #0071e3;
+
+  --success: #248a3d;
+  --warn: #b25e09;
+  --danger: #d70015;
+
+  --human: #0071e3;
+  --agent: #bf5af2; /* sparse status only */
+
+  /* Radius — Apple-ish, not pill-heavy */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  /* Space */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-8: 32px;
+
+  /* Type */
+  --font: "IBM Plex Sans", "Hiragino Sans", "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-xs: 0.6875rem; /* 11 */
+  --text-sm: 0.8125rem; /* 13 */
+  --text-md: 0.875rem; /* 14 */
+  --text-lg: 1.0625rem; /* 17 */
+  --text-xl: 1.25rem; /* 20 */
+
+  --tracking-tight: -0.022em;
+  --tracking-label: 0.04em;
+
+  /* Motion */
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --dur: 140ms;
+  --dur-med: 220ms;
+
+  /* Shadows — single soft layer only */
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --bg-elevated: #1c1c1e;
+    --bg-subtle: #2c2c2e;
+    --bg-hover: rgba(255, 255, 255, 0.04);
+    --bg-active: rgba(255, 255, 255, 0.07);
+
+    --ink: #f5f5f7;
+    --ink-secondary: #a1a1a6;
+    --ink-tertiary: #8e8e93;
+    --ink-quaternary: #636366;
+
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --line-focus: rgba(10, 132, 255, 0.55);
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-soft: rgba(10, 132, 255, 0.14);
+    --accent-ink: #64d2ff;
+
+    --success: #30d158;
+    --warn: #ff9f0a;
+    --danger: #ff453a;
+
+    --human: #64d2ff;
+    --agent: #bf5af2;
+
+    --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+}

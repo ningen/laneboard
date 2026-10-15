@@ -1,0 +1,44 @@
+name: Desktop
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: windows-latest
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+      - name: Install frontend deps
+        working-directory: apps/desktop
+        run: npm ci
+      - name: Build Tauri
+        working-directory: apps/desktop
+        run: npm run tauri build -- ${{ matrix.args }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: board-${{ matrix.platform }}${{ matrix.args && format('-{0}', matrix.args) || '' }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle
+            apps/desktop/src-tauri/target/*/release/bundle
+          if-no-files-found: warn

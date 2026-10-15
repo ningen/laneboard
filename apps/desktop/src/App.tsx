@@ -102,18 +102,18 @@ export default function App() {
       <header className="topbar">
         <div className="brand">
           <strong>Board</strong>
-          <span>human + agent kanban</span>
+          <span>Human &amp; agent</span>
         </div>
         <div className="search">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search cards, keys, labels…"
+            placeholder="Search"
             aria-label="Search"
           />
         </div>
         <div className="top-actions">
-          <button className="btn" type="button" onClick={() => void refresh(query)}>
+          <button className="btn ghost" type="button" onClick={() => void refresh(query)}>
             Refresh
           </button>
           <button
@@ -226,7 +226,7 @@ export default function App() {
                     <button
                       key={s}
                       type="button"
-                      className="btn"
+                      className="btn tiny"
                       disabled={selected.card.status === s}
                       onClick={() => void moveTo(selected.card.id, s)}
                     >
@@ -236,7 +236,7 @@ export default function App() {
                 </div>
                 {selected.links.length > 0 && (
                   <>
-                    <h3 style={{ marginTop: "1rem" }}>Links</h3>
+                    <h3 style={{ marginTop: "var(--s-5)" }}>Links</h3>
                     {selected.links.map((l) => (
                       <div key={l.id} className="event">
                         <span>
@@ -249,7 +249,7 @@ export default function App() {
                 )}
                 {selected.recent_events.length > 0 && (
                   <>
-                    <h3 style={{ marginTop: "1rem" }}>Card timeline</h3>
+                    <h3 style={{ marginTop: "var(--s-5)" }}>Timeline</h3>
                     {selected.recent_events.slice(0, 8).map((ev) => (
                       <div key={ev.id} className="event">
                         <time>{new Date(ev.at).toLocaleString()}</time>
