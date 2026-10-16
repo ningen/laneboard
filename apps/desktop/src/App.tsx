@@ -348,6 +348,21 @@ export default function App() {
                       </p>
                     </section>
 
+                    {selected.card.external_url && (
+                      <section className="props-block">
+                        <h4>External</h4>
+                        <p className="prop-value">
+                          <a
+                            href={selected.card.external_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {selected.card.external_url}
+                          </a>
+                        </p>
+                      </section>
+                    )}
+
                     {selected.card.labels.length > 0 && (
                       <section className="props-block">
                         <h4>Labels</h4>

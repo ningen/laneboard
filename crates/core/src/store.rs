@@ -126,6 +126,37 @@ impl BoardStore {
         found.ok_or_else(|| Error::NotFound(id_or_key.to_string()))
     }
 
+    /// Find a card previously imported/linked by its external URL (exact match).
+    pub fn find_by_external_url(&self, url: &str) -> Result<Option<Card>> {
+        let url = url.trim();
+        if url.is_empty() {
+            return Ok(None);
+        }
+        let mut stmt = self
+            .conn
+            .prepare("SELECT * FROM cards WHERE external_url = ?1 LIMIT 1")?;
+        let mut rows = stmt.query_map([url], Self::row_to_card)?;
+        match rows.next() {
+            Some(Ok(card)) => Ok(Some(card)),
+            Some(Err(e)) => Err(e.into()),
+            None => Ok(None),
+        }
+    }
+
+    /// Cards whose external_url is set (GitLab / GitHub / … links).
+    pub fn list_with_external_url(&self) -> Result<Vec<Card>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM cards WHERE external_url IS NOT NULL AND external_url != ''
+             ORDER BY updated_at DESC",
+        )?;
+        let rows = stmt.query_map([], Self::row_to_card)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     fn append_event(
         &self,
         card_id: Option<&str>,

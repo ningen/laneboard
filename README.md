@@ -76,6 +76,20 @@ Windows CLI (prebuilt): [`dist/board-windows-x64.exe`](dist/board-windows-x64.ex
 - **events** — append-only timeline  
 - **cards_fts** — SQLite FTS5  
 
+## GitLab
+
+Pull GitLab Issues into the board (local SQLite; no webhooks):
+
+```bash
+export GITLAB_TOKEN=glpat-…          # read_api
+# export GITLAB_URL=https://gitlab.example.com   # self-managed
+board gitlab doctor
+board gitlab import group/project
+board gitlab sync group/project
+```
+
+Details: [`docs/gitlab.md`](docs/gitlab.md). CI smoke on GitLab runners: [`.gitlab-ci.yml`](.gitlab-ci.yml).
+
 ## Agent path (MCP)
 
 For Claude Code (especially with sandbox), prefer MCP over Bash `board …`.
