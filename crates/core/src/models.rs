@@ -162,6 +162,20 @@ pub struct Event {
     pub payload: serde_json::Value,
 }
 
+/// Timeline row enriched with card key/title for the desktop activity feed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityItem {
+    pub id: i64,
+    pub at: DateTime<Utc>,
+    pub actor_kind: String,
+    pub actor_name: Option<String>,
+    pub card_id: Option<String>,
+    pub card_key: Option<String>,
+    pub card_title: Option<String>,
+    pub kind: String,
+    pub payload: serde_json::Value,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CardDetail {
     pub card: Card,

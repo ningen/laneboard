@@ -10,7 +10,7 @@ Design: Linear / Plane–style board UX (dense cards, status color, detail drawe
 
 ## Direction
 
-**Tauri is the primary desktop surface.** Native window first (tray / notifications / OS integration later). `board ui` remains a headless/dev browser fallback.
+**Tauri is the primary desktop surface.** Live board watch, system tray, OS notifications, and an Activity feed for agent traffic. `board ui` remains a headless/dev browser fallback (live poll + feed; no tray).
 
 ## What’s in the box
 

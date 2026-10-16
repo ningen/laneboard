@@ -28,7 +28,8 @@ Light is default; `prefers-color-scheme: dark` remaps neutrals and accents.
 
 | Region | Role |
 |---|---|
-| Top bar | Brand, search (`⌘K`), Refresh / Seed, **New issue** |
+| Top bar | Brand, search (`⌘K`), Live indicator, Activity / Refresh / Seed, **New issue** |
+| Activity feed | Collapsible left rail: actor + kind + card key (not a second kanban) |
 | Board | Five status columns with drop targets |
 | Drawer | Issue detail + status move + Properties / Activity tabs |
 | Modal | Create issue → backlog |

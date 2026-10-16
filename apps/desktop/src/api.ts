@@ -74,6 +74,13 @@ export async function api<T>(
       const limit = (args?.limit as number | undefined) ?? 40;
       return http(`/api/timeline?limit=${limit}`);
     }
+    case "latest_event_id":
+      return http("/api/events/latest-id");
+    case "list_activity": {
+      const limit = (args?.limit as number | undefined) ?? 40;
+      const after = (args?.after_id as number | undefined) ?? 0;
+      return http(`/api/activity?limit=${limit}&after_id=${after}`);
+    }
     case "db_path":
       return http("/api/db-path");
     case "get_gitlab_settings":

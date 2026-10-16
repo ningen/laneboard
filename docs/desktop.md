@@ -5,7 +5,10 @@
 Board is meant to feel like a real desktop control surface for humans watching agents:
 
 - Always-on window (not a buried browser tab)
-- Future: tray, global shortcuts, notifications, deep links, file drops
+- Live board refresh via event-id polling (agents move cards → UI follows)
+- System tray + OS notifications for blocked / done / agent claim events
+- Collapsible Activity feed (agent/human timeline with card keys)
+- Future: global shortcuts, deep links, file drops
 - Still shares `board-core` + the same SQLite file as the CLI
 
 Cross-compiling Tauri installers from Linux is not supported here — ship from macOS and Windows builders (or CI runners on those OSes).
@@ -39,4 +42,9 @@ npm run tauri build
 
 Both use `board-core::BoardStore::path_hint()` → `<data_dir>/board/board.db`.
 
-After an agent runs `board move …`, hit **Refresh** in the desktop UI (live watch can come later).
+The desktop UI polls `latest_event_id` about every 1.5s. When the cursor advances it
+refreshes the board, Activity feed, and (in Tauri) may emit an OS notification for
+`moved → blocked|done` and agent claim/release events. Tray icon: left-click or
+**Show Board** brings the window forward.
+
+Toggle the Activity panel with the top-bar **Activity** button or `⌘\\` / `Ctrl+\\`.

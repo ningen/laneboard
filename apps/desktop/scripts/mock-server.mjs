@@ -184,6 +184,28 @@ const server = http.createServer(async (req, res) => {
   if (pathname === "/api/board") return json(res, 200, board());
   if (pathname === "/api/db-path") return json(res, 200, "/tmp/laneboard-mock/board.db");
   if (pathname === "/api/timeline") return json(res, 200, events.slice().reverse());
+  if (pathname === "/api/events/latest-id") {
+    const maxId = events.reduce((m, e) => Math.max(m, e.id), 0);
+    return json(res, 200, maxId);
+  }
+  if (pathname === "/api/activity") {
+    const after = Number(url.searchParams.get("after_id") || 0);
+    const limit = Number(url.searchParams.get("limit") || 40);
+    const items = events
+      .filter((e) => e.id > after)
+      .slice()
+      .reverse()
+      .slice(0, limit)
+      .map((e) => {
+        const card = cards.find((c) => c.id === e.card_id);
+        return {
+          ...e,
+          card_key: card?.key ?? null,
+          card_title: card?.title ?? null,
+        };
+      });
+    return json(res, 200, items);
+  }
   if (pathname === "/api/cards" && req.method === "GET") {
     const q = (url.searchParams.get("q") || "").toLowerCase();
     const list = q
