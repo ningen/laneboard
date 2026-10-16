@@ -48,6 +48,20 @@ cargo run -p board -- ls --json
 cargo run -p board -- move CARD-1 --to doing --actor agent --actor-name cursor --json
 ```
 
+### Nix
+
+```bash
+# one-shot
+nix run github:ningen/laneboard -- ls --json
+
+# install into your profile
+nix profile install github:ningen/laneboard
+
+# from a checkout
+nix build
+./result/bin/board --help
+```
+
 Windows CLI (prebuilt): [`dist/board-windows-x64.exe`](dist/board-windows-x64.exe)
 
 ```powershell
@@ -97,6 +111,7 @@ Session loop: `board_list` → `board_claim` → `board_get` → work → `board
 crates/core          domain + SQLite
 crates/cli           board binary
 apps/desktop         Tauri app
+nix/                 Nix package (`board` CLI)
 docs/                design system + desktop notes
 dist/                prebuilt CLI / smoke binaries
 ```
