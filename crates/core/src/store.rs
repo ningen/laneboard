@@ -157,6 +157,49 @@ impl BoardStore {
         Ok(out)
     }
 
+    pub fn get_meta(&self, key: &str) -> Result<Option<String>> {
+        let found: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT value FROM meta WHERE key = ?1",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        Ok(found)
+    }
+
+    pub fn put_meta(&self, key: &str, value: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO meta(key, value) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, value],
+        )?;
+        Ok(())
+    }
+
+    pub fn gitlab_settings(&self) -> Result<crate::gitlab::GitLabSettings> {
+        match self.get_meta(crate::gitlab::SETTINGS_META_KEY)? {
+            Some(raw) => Ok(serde_json::from_str(&raw).unwrap_or_default()),
+            None => Ok(crate::gitlab::GitLabSettings::default()),
+        }
+    }
+
+    pub fn gitlab_settings_view(&self) -> Result<crate::gitlab::GitLabSettingsView> {
+        Ok(self.gitlab_settings()?.view())
+    }
+
+    pub fn save_gitlab_settings(
+        &self,
+        update: crate::gitlab::GitLabSettingsUpdate,
+    ) -> Result<crate::gitlab::GitLabSettingsView> {
+        let mut settings = self.gitlab_settings()?;
+        settings.apply_update(update);
+        let raw = serde_json::to_string(&settings)?;
+        self.put_meta(crate::gitlab::SETTINGS_META_KEY, &raw)?;
+        Ok(settings.view())
+    }
+
     fn append_event(
         &self,
         card_id: Option<&str>,

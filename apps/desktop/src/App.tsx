@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "./api";
+import { SettingsModal } from "./SettingsModal";
 import {
   BoardSnapshot,
   Card,
@@ -24,6 +25,7 @@ export default function App() {
   const [body, setBody] = useState("");
   const [dragId, setDragId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("properties");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -61,7 +63,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (composerOpen) setComposerOpen(false);
+        if (settingsOpen) setSettingsOpen(false);
+        else if (composerOpen) setComposerOpen(false);
         else closeDrawer();
       }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -72,10 +75,14 @@ export default function App() {
         e.preventDefault();
         setComposerOpen(true);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [composerOpen]);
+  }, [composerOpen, settingsOpen]);
 
   const openCard = async (id: string) => {
     try {
@@ -179,6 +186,14 @@ export default function App() {
             }}
           >
             Seed
+          </button>
+          <button
+            className="btn ghost"
+            type="button"
+            title="Settings (⌘,)"
+            onClick={() => setSettingsOpen(true)}
+          >
+            Settings
           </button>
           <button className="btn primary" type="button" onClick={() => setComposerOpen(true)}>
             New issue
@@ -493,6 +508,13 @@ export default function App() {
           </div>,
           document.body,
         )}
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onImported={() => void refresh(query)}
+        onError={(msg) => setError(msg)}
+      />
     </div>
   );
 }

@@ -288,8 +288,6 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing-subscriber",
- "ureq",
- "urlencoding",
 ]
 
 [[package]]
@@ -303,6 +301,8 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "ureq",
+ "urlencoding",
  "uuid",
 ]
 

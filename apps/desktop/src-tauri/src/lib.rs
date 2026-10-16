@@ -1,6 +1,6 @@
 use board_core::{
-    AssigneeKind, BoardSnapshot, BoardStore, Card, CardDetail, CreateCard, Event, ListFilter,
-    Status, UpdateCard,
+    gitlab, AssigneeKind, BoardSnapshot, BoardStore, Card, CardDetail, CreateCard, Event,
+    GitLabSettingsUpdate, GitLabSettingsView, ListFilter, Status, SyncReport, UpdateCard,
 };
 use serde::Deserialize;
 use std::sync::Mutex;
@@ -125,6 +125,39 @@ fn db_path() -> String {
     BoardStore::path_hint().display().to_string()
 }
 
+#[tauri::command]
+fn get_gitlab_settings(state: State<'_, AppState>) -> Result<GitLabSettingsView, String> {
+    with_store(&state, |s| s.gitlab_settings_view())
+}
+
+#[tauri::command]
+fn save_gitlab_settings(
+    state: State<'_, AppState>,
+    input: GitLabSettingsUpdate,
+) -> Result<GitLabSettingsView, String> {
+    with_store(&state, |s| s.save_gitlab_settings(input))
+}
+
+#[tauri::command]
+fn gitlab_doctor(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    with_store(&state, gitlab::doctor_from_settings)
+}
+
+#[derive(Deserialize)]
+struct GitlabRunInput {
+    dry_run: Option<bool>,
+}
+
+#[tauri::command]
+fn gitlab_import(state: State<'_, AppState>, input: GitlabRunInput) -> Result<SyncReport, String> {
+    with_store(&state, |s| gitlab::import_from_settings(s, input.dry_run.unwrap_or(false)))
+}
+
+#[tauri::command]
+fn gitlab_sync(state: State<'_, AppState>, input: GitlabRunInput) -> Result<SyncReport, String> {
+    with_store(&state, |s| gitlab::sync_from_settings(s, input.dry_run.unwrap_or(false)))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = BoardStore::open_default().expect("open board database");
@@ -145,6 +178,11 @@ pub fn run() {
             seed_demo,
             timeline,
             db_path,
+            get_gitlab_settings,
+            save_gitlab_settings,
+            gitlab_doctor,
+            gitlab_import,
+            gitlab_sync,
         ])
         .run(tauri::generate_context!())
         .expect("error while running board desktop");
