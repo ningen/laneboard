@@ -62,6 +62,11 @@ Windows CLI (prebuilt): [`dist/board-windows-x64.exe`](dist/board-windows-x64.ex
 - **events** — append-only timeline  
 - **cards_fts** — SQLite FTS5  
 
+## Agent path (MCP)
+
+For Claude Code (especially with sandbox), prefer MCP over Bash `board …`.
+Tool surface draft: [`docs/mcp-tools.md`](docs/mcp-tools.md).
+
 ## Layout
 
 ```
