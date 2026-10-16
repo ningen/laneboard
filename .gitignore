@@ -14,6 +14,8 @@ apps/desktop/src-tauri/WixTools
 apps/desktop/src-tauri/icons/android/
 apps/desktop/src-tauri/icons/ios/
 *.log
+/result
+.direnv
 
 # Keep prebuilt Windows CLI; ignore other build junk under dist/
 dist/*
