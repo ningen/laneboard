@@ -136,5 +136,33 @@ fn migrate(conn: &Connection) -> Result<()> {
         )?;
     }
 
+    migrate_v2(conn)?;
+
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let rows = stmt.query_map([], |row| {
+        let name: String = row.get(1)?;
+        Ok(name)
+    })?;
+    for row in rows {
+        if row? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn migrate_v2(conn: &Connection) -> Result<()> {
+    if !column_exists(conn, "cards", "claim_expires_at")? {
+        conn.execute("ALTER TABLE cards ADD COLUMN claim_expires_at TEXT", [])?;
+    }
+    conn.execute(
+        "INSERT INTO meta(key, value) VALUES ('schema_version', '2')
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [],
+    )?;
     Ok(())
 }

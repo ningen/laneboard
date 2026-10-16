@@ -127,8 +127,18 @@ pub struct Card {
     pub assignee_name: Option<String>,
     pub priority: i32,
     pub external_url: Option<String>,
+    /// When set and in the future, another agent holds an exclusive claim.
+    #[serde(default)]
+    pub claim_expires_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Lease {
+    pub holder_kind: String,
+    pub holder_name: Option<String>,
+    pub expires_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -157,6 +167,16 @@ pub struct CardDetail {
     pub card: Card,
     pub links: Vec<CardLink>,
     pub recent_events: Vec<Event>,
+    #[serde(default)]
+    pub lease: Option<Lease>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaimCard {
+    pub ttl_minutes: i64,
+    pub note: Option<String>,
+    pub actor_kind: String,
+    pub actor_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

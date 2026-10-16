@@ -62,6 +62,35 @@ Windows CLI (prebuilt): [`dist/board-windows-x64.exe`](dist/board-windows-x64.ex
 - **events** — append-only timeline  
 - **cards_fts** — SQLite FTS5  
 
+## Agent path (MCP)
+
+For Claude Code (especially with sandbox), prefer MCP over Bash `board …`.
+Tool surface: [`docs/mcp-tools.md`](docs/mcp-tools.md).
+
+```bash
+BOARD_ACTOR_NAME=claude cargo run -p board -- mcp
+# or after install: board mcp
+```
+
+Claude Code `mcpServers` example:
+
+```json
+{
+  "mcpServers": {
+    "laneboard": {
+      "command": "board",
+      "args": ["mcp"],
+      "env": {
+        "BOARD_DB": "/absolute/path/to/board.db",
+        "BOARD_ACTOR_NAME": "claude"
+      }
+    }
+  }
+}
+```
+
+Session loop: `board_list` → `board_claim` → `board_get` → work → `board_note` → `board_move`.
+
 ## Layout
 
 ```
