@@ -6,7 +6,7 @@ Agents move cards with `board … --json`. People use the native Board window on
 
 ![Board desktop — kanban with detail panel](docs/images/desktop.png)
 
-Design: Linear-style restraint + Apple HIG surfaces — see [`docs/design-system.md`](docs/design-system.md).
+Design: Linear / Plane–style board UX (dense cards, status color, detail drawer) — see [`docs/design-system.md`](docs/design-system.md).
 
 ## Direction
 
