@@ -13,8 +13,15 @@ export interface Card {
   assignee_name: string | null;
   priority: number;
   external_url: string | null;
+  claim_expires_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface Lease {
+  holder_kind: string;
+  holder_name: string | null;
+  expires_at: string;
 }
 
 export interface ColumnSnapshot {
@@ -46,6 +53,7 @@ export interface CardDetail {
     note: string | null;
   }>;
   recent_events: Event[];
+  lease?: Lease | null;
 }
 
 export const COLUMNS: Status[] = [

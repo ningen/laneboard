@@ -44,6 +44,7 @@ impl BoardStore {
         let labels_json: String = row.get("labels_json")?;
         let created_at: String = row.get("created_at")?;
         let updated_at: String = row.get("updated_at")?;
+        let claim_expires_at: Option<String> = row.get("claim_expires_at")?;
         Ok(Card {
             id: row.get("id")?,
             key: row.get("key")?,
@@ -55,9 +56,62 @@ impl BoardStore {
             assignee_name: row.get("assignee_name")?,
             priority: row.get("priority")?,
             external_url: row.get("external_url")?,
+            claim_expires_at: claim_expires_at.and_then(|s| s.parse().ok()),
             created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
             updated_at: updated_at.parse().unwrap_or_else(|_| Utc::now()),
         })
+    }
+
+    /// Active lease if assignee holds an unexpired claim.
+    pub fn lease_of(card: &Card) -> Option<Lease> {
+        let expires_at = card.claim_expires_at?;
+        if expires_at <= Utc::now() {
+            return None;
+        }
+        if matches!(card.assignee_kind, AssigneeKind::Unassigned) {
+            return None;
+        }
+        Some(Lease {
+            holder_kind: card.assignee_kind.as_str().to_string(),
+            holder_name: card.assignee_name.clone(),
+            expires_at,
+        })
+    }
+
+    fn same_actor(card: &Card, actor_kind: &str, actor_name: Option<&str>) -> bool {
+        card.assignee_kind.as_str() == actor_kind
+            && card.assignee_name.as_deref() == actor_name
+            && !matches!(card.assignee_kind, AssigneeKind::Unassigned)
+    }
+
+    /// Cards that block `id` and are not yet done (`blocked_by` edges).
+    pub fn open_blockers(&self, id_or_key: &str) -> Result<Vec<Card>> {
+        let id = self.resolve_card_id(id_or_key)?;
+        let mut stmt = self.conn.prepare(
+            "SELECT c.* FROM card_links l
+             JOIN cards c ON c.id = l.to_id
+             WHERE l.from_id = ?1 AND l.link_type = 'blocked_by' AND c.status != 'done'
+             ORDER BY c.key",
+        )?;
+        let rows = stmt.query_map([&id], Self::row_to_card)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    fn ensure_unblocked(&self, id_or_key: &str) -> Result<()> {
+        let blockers = self.open_blockers(id_or_key)?;
+        if blockers.is_empty() {
+            return Ok(());
+        }
+        let keys: Vec<&str> = blockers.iter().map(|c| c.key.as_str()).collect();
+        Err(Error::BlockedByDeps(format!(
+            "{} is blocked by: {}",
+            id_or_key,
+            keys.join(", ")
+        )))
     }
 
     fn resolve_card_id(&self, id_or_key: &str) -> Result<String> {
@@ -150,13 +204,155 @@ impl BoardStore {
 
     pub fn get_card_detail(&self, id_or_key: &str, event_limit: usize) -> Result<CardDetail> {
         let card = self.get_card(id_or_key)?;
+        let lease = Self::lease_of(&card);
         let links = self.list_links(&card.id)?;
         let recent_events = self.list_events(Some(&card.id), event_limit)?;
         Ok(CardDetail {
             card,
             links,
             recent_events,
+            lease,
         })
+    }
+
+    /// Ready cards with no active lease (default MCP `board_list`).
+    pub fn list_claimable(&self, limit: usize) -> Result<Vec<Card>> {
+        let now = Utc::now().to_rfc3339();
+        let limit = limit.max(1) as i64;
+        let mut stmt = self.conn.prepare(
+            "SELECT * FROM cards
+             WHERE status = 'ready'
+               AND (
+                 assignee_kind = 'unassigned'
+                 OR claim_expires_at IS NULL
+                 OR claim_expires_at <= ?1
+               )
+             ORDER BY priority DESC, updated_at DESC
+             LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![now, limit], Self::row_to_card)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    pub fn claim_card(&self, id_or_key: &str, input: ClaimCard) -> Result<Card> {
+        let id = self.resolve_card_id(id_or_key)?;
+        let card = self.get_card(&id)?;
+        if let Some(lease) = Self::lease_of(&card) {
+            if !Self::same_actor(&card, &input.actor_kind, input.actor_name.as_deref()) {
+                return Err(Error::AlreadyClaimed(format!(
+                    "{} is claimed by {}:{} until {}",
+                    card.key,
+                    lease.holder_kind,
+                    lease.holder_name.as_deref().unwrap_or("?"),
+                    lease.expires_at.to_rfc3339()
+                )));
+            }
+            // Same actor may renew an active lease while already doing.
+        } else if !matches!(card.status, Status::Ready) {
+            return Err(Error::NotClaimable(format!(
+                "{} is {}, only ready cards can be claimed",
+                card.key, card.status
+            )));
+        }
+        self.ensure_unblocked(&id)?;
+
+        let ttl = input.ttl_minutes.clamp(5, 240);
+        let expires = Utc::now() + chrono::Duration::minutes(ttl);
+        let now = Utc::now();
+        self.conn.execute(
+            "UPDATE cards SET status = 'doing', assignee_kind = ?1, assignee_name = ?2,
+             claim_expires_at = ?3, updated_at = ?4 WHERE id = ?5",
+            params![
+                input.actor_kind,
+                input.actor_name,
+                expires.to_rfc3339(),
+                now.to_rfc3339(),
+                id,
+            ],
+        )?;
+        self.append_event(
+            Some(&id),
+            "claimed",
+            &input.actor_kind,
+            input.actor_name.as_deref(),
+            json!({
+                "ttl_minutes": ttl,
+                "expires_at": expires.to_rfc3339(),
+                "note": input.note,
+            }),
+        )?;
+        self.get_card(&id)
+    }
+
+    pub fn release_card(
+        &self,
+        id_or_key: &str,
+        to: Status,
+        note: Option<&str>,
+        actor_kind: &str,
+        actor_name: Option<&str>,
+    ) -> Result<Card> {
+        if !matches!(to, Status::Ready | Status::Blocked) {
+            return Err(Error::Validation(
+                "release target must be ready or blocked".into(),
+            ));
+        }
+        let id = self.resolve_card_id(id_or_key)?;
+        let card = self.get_card(&id)?;
+        if let Some(lease) = Self::lease_of(&card) {
+            if !Self::same_actor(&card, actor_kind, actor_name) {
+                return Err(Error::AlreadyClaimed(format!(
+                    "{} is claimed by {}:{} until {}",
+                    card.key,
+                    lease.holder_kind,
+                    lease.holder_name.as_deref().unwrap_or("?"),
+                    lease.expires_at.to_rfc3339()
+                )));
+            }
+        }
+        let now = Utc::now().to_rfc3339();
+        self.conn.execute(
+            "UPDATE cards SET status = ?1, assignee_kind = 'unassigned', assignee_name = NULL,
+             claim_expires_at = NULL, updated_at = ?2 WHERE id = ?3",
+            params![to.as_str(), now, id],
+        )?;
+        self.append_event(
+            Some(&id),
+            "released",
+            actor_kind,
+            actor_name,
+            json!({ "to": to.as_str(), "note": note }),
+        )?;
+        self.get_card(&id)
+    }
+
+    pub fn add_note(
+        &self,
+        id_or_key: &str,
+        note: &str,
+        actor_kind: &str,
+        actor_name: Option<&str>,
+    ) -> Result<Card> {
+        let note = note.trim();
+        if note.is_empty() {
+            return Err(Error::Validation("note must not be empty".into()));
+        }
+        let id = self.resolve_card_id(id_or_key)?;
+        let now = Utc::now().to_rfc3339();
+        self.conn
+            .execute("UPDATE cards SET updated_at = ?1 WHERE id = ?2", params![now, id])?;
+        self.append_event(
+            Some(&id),
+            "note",
+            actor_kind,
+            actor_name,
+            json!({ "text": note }),
+        )?;
+        self.get_card(&id)
     }
 
     pub fn list_cards(&self, filter: &ListFilter) -> Result<Vec<Card>> {
@@ -262,11 +458,22 @@ impl BoardStore {
     ) -> Result<Card> {
         let id = self.resolve_card_id(id_or_key)?;
         let before = self.get_card(&id)?;
+        if matches!(to, Status::Done | Status::Doing) {
+            self.ensure_unblocked(&id)?;
+        }
         let now = Utc::now().to_rfc3339();
-        self.conn.execute(
-            "UPDATE cards SET status = ?1, updated_at = ?2 WHERE id = ?3",
-            params![to.as_str(), now, id],
-        )?;
+        let clear_lease = matches!(to, Status::Done | Status::Blocked | Status::Backlog | Status::Ready);
+        if clear_lease {
+            self.conn.execute(
+                "UPDATE cards SET status = ?1, claim_expires_at = NULL, updated_at = ?2 WHERE id = ?3",
+                params![to.as_str(), now, id],
+            )?;
+        } else {
+            self.conn.execute(
+                "UPDATE cards SET status = ?1, updated_at = ?2 WHERE id = ?3",
+                params![to.as_str(), now, id],
+            )?;
+        }
         self.append_event(
             Some(&id),
             "moved",
@@ -308,8 +515,11 @@ impl BoardStore {
         let now = Utc::now();
         card.updated_at = now;
         let labels_json = serde_json::to_string(&card.labels)?;
+        let claim_expires = card
+            .claim_expires_at
+            .map(|t| t.to_rfc3339());
         self.conn.execute(
-            "UPDATE cards SET title=?1, body=?2, labels_json=?3, assignee_kind=?4, assignee_name=?5, priority=?6, external_url=?7, updated_at=?8 WHERE id=?9",
+            "UPDATE cards SET title=?1, body=?2, labels_json=?3, assignee_kind=?4, assignee_name=?5, priority=?6, external_url=?7, claim_expires_at=?8, updated_at=?9 WHERE id=?10",
             params![
                 card.title,
                 card.body,
@@ -318,6 +528,7 @@ impl BoardStore {
                 card.assignee_name,
                 card.priority,
                 card.external_url,
+                claim_expires,
                 now.to_rfc3339(),
                 id,
             ],

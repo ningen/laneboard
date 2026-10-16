@@ -1,10 +1,11 @@
+mod mcp;
 mod ui_server;
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use board_core::{
-    AssigneeKind, BoardStore, CreateCard, LinkType, ListFilter, Status, UpdateCard,
+    AssigneeKind, BoardStore, ClaimCard, CreateCard, LinkType, ListFilter, Status, UpdateCard,
 };
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
@@ -145,6 +146,41 @@ enum Commands {
         #[arg(long, default_value_t = 7841)]
         port: u16,
     },
+    /// Run MCP stdio server (primary agent path; see docs/mcp-tools.md)
+    Mcp,
+    /// Claim a ready card (lease + move to doing)
+    Claim {
+        id: String,
+        #[arg(long, default_value_t = 60)]
+        ttl_minutes: i64,
+        #[arg(long)]
+        note: Option<String>,
+        #[arg(long, default_value = "agent")]
+        actor: String,
+        #[arg(long)]
+        actor_name: Option<String>,
+    },
+    /// Release a claim back to ready/blocked
+    Release {
+        id: String,
+        #[arg(long = "to", default_value = "ready")]
+        to: String,
+        #[arg(long)]
+        note: Option<String>,
+        #[arg(long, default_value = "agent")]
+        actor: String,
+        #[arg(long)]
+        actor_name: Option<String>,
+    },
+    /// Append a timeline note
+    Note {
+        id: String,
+        note: String,
+        #[arg(long, default_value = "agent")]
+        actor: String,
+        #[arg(long)]
+        actor_name: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -170,6 +206,10 @@ fn main() -> Result<()> {
     if let Commands::Ui { host, port } = &cli.command {
         let rt = tokio::runtime::Runtime::new().context("tokio runtime")?;
         return rt.block_on(ui_server::run(cli.db.clone(), host, *port));
+    }
+    if matches!(cli.command, Commands::Mcp) {
+        let rt = tokio::runtime::Runtime::new().context("tokio runtime")?;
+        return rt.block_on(mcp::run(cli.db.clone()));
     }
 
     let store = match &cli.db {
@@ -435,7 +475,62 @@ fn main() -> Result<()> {
             let data = store.export_json()?;
             println!("{}", serde_json::to_string_pretty(&data)?);
         }
-        Commands::Ui { .. } => unreachable!("handled before store open"),
+        Commands::Claim {
+            id,
+            ttl_minutes,
+            note,
+            actor,
+            actor_name,
+        } => {
+            let card = store.claim_card(
+                &id,
+                ClaimCard {
+                    ttl_minutes,
+                    note,
+                    actor_kind: actor,
+                    actor_name,
+                },
+            )?;
+            print_out(&cli.json, &card, || {
+                println!(
+                    "{} claimed → {} (lease {:?})",
+                    card.key, card.status, card.claim_expires_at
+                );
+                Ok(())
+            })?;
+        }
+        Commands::Release {
+            id,
+            to,
+            note,
+            actor,
+            actor_name,
+        } => {
+            let card = store.release_card(
+                &id,
+                Status::parse(&to)?,
+                note.as_deref(),
+                &actor,
+                actor_name.as_deref(),
+            )?;
+            print_out(&cli.json, &card, || {
+                println!("{} released → {}", card.key, card.status);
+                Ok(())
+            })?;
+        }
+        Commands::Note {
+            id,
+            note,
+            actor,
+            actor_name,
+        } => {
+            let card = store.add_note(&id, &note, &actor, actor_name.as_deref())?;
+            print_out(&cli.json, &card, || {
+                println!("{} note added", card.key);
+                Ok(())
+            })?;
+        }
+        Commands::Ui { .. } | Commands::Mcp => unreachable!("handled before store open"),
     }
 
     Ok(())

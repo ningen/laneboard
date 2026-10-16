@@ -479,13 +479,19 @@ team configs so humans and agents share one file.
 
 ---
 
-## Implementation sketch
+## Implementation status
 
-1. `crates/core`: lease columns + `claim` / `release` / `add_note`; dep check helper  
-2. `crates/mcp` (or `board mcp` subcommand): rmcp/stdio, tool table above  
-3. Desktop: show lease holder + expiry on cards; timeline renders `note` / `claimed`  
-4. Docs: Claude Code config snippet + session recipe  
-5. Tests: claim conflict, expired steal, note event, blocked_by on done  
+Shipped:
 
-Keep the public agent surface at **these nine tools**; add CLI mirrors later for
-parity, not the other way around.
+1. `crates/core` — `claim_expires_at`, `claim_card` / `release_card` / `add_note` / `list_claimable` / `open_blockers`; dep gate on →`doing`/`done`
+2. `board mcp` — rmcp stdio server with the nine tools above
+3. CLI mirrors — `board claim|release|note`
+4. Tests — claim conflict, note event, blocked_by on done
+
+Follow-ups:
+
+- Desktop: show lease holder + expiry on cards; richer timeline for `note` / `claimed`
+- Expired-lease steal coverage + `board_heartbeat`
+- Acceptance checklist tools (v1.1)
+
+Keep the public agent surface at **these nine tools**.
