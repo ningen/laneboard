@@ -1,3 +1,4 @@
+mod gitlab;
 mod mcp;
 mod ui_server;
 
@@ -47,6 +48,9 @@ enum Commands {
         assignee_name: Option<String>,
         #[arg(long)]
         priority: Option<i32>,
+        /// Link to an external issue / MR (e.g. GitLab)
+        #[arg(long)]
+        external_url: Option<String>,
         #[arg(long, default_value = "human")]
         actor: String,
         #[arg(long)]
@@ -102,6 +106,8 @@ enum Commands {
         assignee_name: Option<String>,
         #[arg(long)]
         priority: Option<i32>,
+        #[arg(long)]
+        external_url: Option<String>,
         #[arg(long, default_value = "human")]
         actor: String,
         #[arg(long)]
@@ -181,6 +187,46 @@ enum Commands {
         #[arg(long)]
         actor_name: Option<String>,
     },
+    /// GitLab issue import / sync (see docs/gitlab.md)
+    Gitlab {
+        #[command(subcommand)]
+        command: GitlabCmd,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GitlabCmd {
+    /// Verify GITLAB_TOKEN against the API
+    Doctor,
+    /// Import issues from a GitLab project into the board
+    Import {
+        /// `group/project` or numeric project id
+        project: String,
+        /// opened | closed | all
+        #[arg(long, default_value = "opened")]
+        state: String,
+        /// Only issues with this GitLab label
+        #[arg(long)]
+        label: Option<String>,
+        /// Board status for open issues (default: ready)
+        #[arg(long, default_value = "ready")]
+        open_status: String,
+        /// Preview without writing
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, default_value = "gitlab")]
+        actor_name: String,
+    },
+    /// Refresh cards already linked via external_url to this project
+    Sync {
+        project: String,
+        #[arg(long, default_value = "ready")]
+        open_status: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long, default_value = "gitlab")]
+        actor_name: String,
+    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]
@@ -243,6 +289,7 @@ fn main() -> Result<()> {
             assignee,
             assignee_name,
             priority,
+            external_url,
             actor,
             actor_name,
         } => {
@@ -254,9 +301,9 @@ fn main() -> Result<()> {
                 assignee_kind: assignee.map(Into::into),
                 assignee_name,
                 priority,
+                external_url,
                 actor_kind: Some(actor),
                 actor_name,
-                ..Default::default()
             })?;
             print_out(&cli.json, &card, || {
                 println!("{} created in {}", card.key, card.status);
@@ -381,6 +428,7 @@ fn main() -> Result<()> {
             assignee,
             assignee_name,
             priority,
+            external_url,
             actor,
             actor_name,
         } => {
@@ -393,9 +441,9 @@ fn main() -> Result<()> {
                     assignee_kind: assignee.map(Into::into),
                     assignee_name,
                     priority,
+                    external_url,
                     actor_kind: Some(actor),
                     actor_name,
-                    ..Default::default()
                 },
             )?;
             print_out(&cli.json, &card, || {
@@ -530,6 +578,90 @@ fn main() -> Result<()> {
                 Ok(())
             })?;
         }
+        Commands::Gitlab { command } => match command {
+            GitlabCmd::Doctor => {
+                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                let info = gitlab::doctor(&client)?;
+                print_out(&cli.json, &info, || {
+                    println!(
+                        "ok  {}  @{}",
+                        info["base_url"].as_str().unwrap_or("?"),
+                        info["user"]["username"].as_str().unwrap_or("?")
+                    );
+                    Ok(())
+                })?;
+            }
+            GitlabCmd::Import {
+                project,
+                state,
+                label,
+                open_status,
+                dry_run,
+                actor_name,
+            } => {
+                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                let report = gitlab::import_issues(
+                    &store,
+                    &client,
+                    gitlab::ImportOpts {
+                        project: &project,
+                        state: gitlab::IssueStateFilter::parse(&state)?,
+                        label: label.as_deref(),
+                        open_status: Status::parse(&open_status)?,
+                        dry_run,
+                        actor_name: Some(&actor_name),
+                    },
+                )?;
+                print_out(&cli.json, &report, || {
+                    println!(
+                        "{}  created={} updated={} unchanged={}",
+                        report.project, report.created, report.updated, report.unchanged
+                    );
+                    for item in &report.items {
+                        println!(
+                            "  {:?}  #{}  {}  {}",
+                            item.action,
+                            item.issue_iid,
+                            item.card_key.as_deref().unwrap_or("-"),
+                            item.title
+                        );
+                    }
+                    Ok(())
+                })?;
+            }
+            GitlabCmd::Sync {
+                project,
+                open_status,
+                dry_run,
+                actor_name,
+            } => {
+                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                let report = gitlab::sync_linked(
+                    &store,
+                    &client,
+                    &project,
+                    Status::parse(&open_status)?,
+                    dry_run,
+                    Some(&actor_name),
+                )?;
+                print_out(&cli.json, &report, || {
+                    println!(
+                        "{}  updated={} unchanged={}",
+                        report.project, report.updated, report.unchanged
+                    );
+                    for item in &report.items {
+                        println!(
+                            "  {:?}  #{}  {}  {}",
+                            item.action,
+                            item.issue_iid,
+                            item.card_key.as_deref().unwrap_or("-"),
+                            item.title
+                        );
+                    }
+                    Ok(())
+                })?;
+            }
+        },
         Commands::Ui { .. } | Commands::Mcp => unreachable!("handled before store open"),
     }
 
