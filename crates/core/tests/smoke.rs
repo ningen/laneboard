@@ -68,5 +68,21 @@ fn create_link_search_timeline() {
     let events = store.list_events(Some(&a.key), 20).unwrap();
     assert!(events.iter().any(|e| e.kind == "moved"));
 
+    let before = store.latest_event_id().unwrap();
+    assert!(before > 0);
+    let activity = store.list_activity(10).unwrap();
+    assert!(!activity.is_empty());
+    let moved = activity.iter().find(|e| e.kind == "moved").unwrap();
+    assert_eq!(moved.card_key.as_deref(), Some(a.key.as_str()));
+    assert_eq!(moved.card_title.as_deref(), Some("Auth middleware"));
+    let since = store.list_activity_since(before, 10).unwrap();
+    assert!(since.is_empty());
+    store
+        .move_card(&b.key, Status::Ready, None, "agent", Some("bot"))
+        .unwrap();
+    let after = store.list_activity_since(before, 10).unwrap();
+    assert_eq!(after.len(), 1);
+    assert_eq!(after[0].card_key.as_deref(), Some(b.key.as_str()));
+
     let _ = std::fs::remove_file(path);
 }

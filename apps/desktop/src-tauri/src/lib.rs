@@ -1,10 +1,14 @@
 use board_core::{
-    gitlab, AssigneeKind, BoardSnapshot, BoardStore, Card, CardDetail, CreateCard, Event,
-    GitLabSettingsUpdate, GitLabSettingsView, ListFilter, Status, SyncReport, UpdateCard,
+    gitlab, ActivityItem, AssigneeKind, BoardSnapshot, BoardStore, Card, CardDetail, CreateCard,
+    Event, GitLabSettingsUpdate, GitLabSettingsView, ListFilter, Status, SyncReport, UpdateCard,
 };
 use serde::Deserialize;
 use std::sync::Mutex;
-use tauri::State;
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, State,
+};
 
 struct AppState {
     store: Mutex<BoardStore>,
@@ -121,6 +125,22 @@ fn timeline(state: State<'_, AppState>, limit: Option<usize>) -> Result<Vec<Even
 }
 
 #[tauri::command]
+fn latest_event_id(state: State<'_, AppState>) -> Result<i64, String> {
+    with_store(&state, |s| s.latest_event_id())
+}
+
+#[tauri::command]
+fn list_activity(
+    state: State<'_, AppState>,
+    limit: Option<usize>,
+    after_id: Option<i64>,
+) -> Result<Vec<ActivityItem>, String> {
+    with_store(&state, |s| {
+        s.list_activity_since(after_id.unwrap_or(0), limit.unwrap_or(40))
+    })
+}
+
+#[tauri::command]
 fn db_path() -> String {
     BoardStore::path_hint().display().to_string()
 }
@@ -158,6 +178,14 @@ fn gitlab_sync(state: State<'_, AppState>, input: GitlabRunInput) -> Result<Sync
     with_store(&state, |s| gitlab::sync_from_settings(s, input.dry_run.unwrap_or(false)))
 }
 
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let store = BoardStore::open_default().expect("open board database");
@@ -165,8 +193,40 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(AppState {
             store: Mutex::new(store),
+        })
+        .setup(|app| {
+            let show_i = MenuItem::with_id(app, "show", "Show Board", true, None::<&str>)?;
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+            let mut tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .tooltip("Laneboard")
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => show_main_window(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                });
+
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+
+            let _ = tray.build(app)?;
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_board,
@@ -177,6 +237,8 @@ pub fn run() {
             update_card,
             seed_demo,
             timeline,
+            latest_event_id,
+            list_activity,
             db_path,
             get_gitlab_settings,
             save_gitlab_settings,

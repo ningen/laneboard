@@ -41,6 +41,8 @@ pub async fn run(db: Option<std::path::PathBuf>, host: &str, port: u16) -> Resul
         .route("/api/cards/{id}/move", post(move_card))
         .route("/api/seed", post(seed_demo))
         .route("/api/timeline", get(timeline))
+        .route("/api/events/latest-id", get(latest_event_id))
+        .route("/api/activity", get(list_activity))
         .route("/api/db-path", get(db_path))
         .route(
             "/api/settings/gitlab",
@@ -245,6 +247,29 @@ async fn timeline(
         .list_events(None, query.limit.unwrap_or(40))
         .map_err(ApiError::from_board)?;
     Ok(Json(events))
+}
+
+async fn latest_event_id(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let id = store.latest_event_id().map_err(ApiError::from_board)?;
+    Ok(Json(id))
+}
+
+#[derive(Deserialize)]
+struct ActivityQuery {
+    limit: Option<usize>,
+    after_id: Option<i64>,
+}
+
+async fn list_activity(
+    State(state): State<AppState>,
+    Query(query): Query<ActivityQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let items = store
+        .list_activity_since(query.after_id.unwrap_or(0), query.limit.unwrap_or(40))
+        .map_err(ApiError::from_board)?;
+    Ok(Json(items))
 }
 
 async fn db_path(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {

@@ -726,6 +726,39 @@ impl BoardStore {
         }
     }
 
+    /// Highest event id (0 when the board has no events yet). Used for live polling.
+    pub fn latest_event_id(&self) -> Result<i64> {
+        let id: i64 = self
+            .conn
+            .query_row("SELECT COALESCE(MAX(id), 0) FROM events", [], |row| row.get(0))?;
+        Ok(id)
+    }
+
+    /// Activity feed with card key/title joined in (newest first).
+    pub fn list_activity(&self, limit: usize) -> Result<Vec<ActivityItem>> {
+        self.list_activity_since(0, limit)
+    }
+
+    /// Events with `id > after_id`, newest first (for incremental live updates).
+    pub fn list_activity_since(&self, after_id: i64, limit: usize) -> Result<Vec<ActivityItem>> {
+        let limit = limit.max(1) as i64;
+        let mut stmt = self.conn.prepare(
+            "SELECT e.id, e.at, e.actor_kind, e.actor_name, e.card_id, e.kind, e.payload_json,
+                    c.key, c.title
+             FROM events e
+             LEFT JOIN cards c ON c.id = e.card_id
+             WHERE e.id > ?1
+             ORDER BY e.at DESC, e.id DESC
+             LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![after_id, limit], Self::row_to_activity)?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     fn row_to_event(row: &rusqlite::Row<'_>) -> rusqlite::Result<Event> {
         let at: String = row.get(1)?;
         let payload_json: String = row.get(6)?;
@@ -737,6 +770,22 @@ impl BoardStore {
             card_id: row.get(4)?,
             kind: row.get(5)?,
             payload: serde_json::from_str(&payload_json).unwrap_or(json!({})),
+        })
+    }
+
+    fn row_to_activity(row: &rusqlite::Row<'_>) -> rusqlite::Result<ActivityItem> {
+        let at: String = row.get(1)?;
+        let payload_json: String = row.get(6)?;
+        Ok(ActivityItem {
+            id: row.get(0)?,
+            at: at.parse().unwrap_or_else(|_| Utc::now()),
+            actor_kind: row.get(2)?,
+            actor_name: row.get(3)?,
+            card_id: row.get(4)?,
+            kind: row.get(5)?,
+            payload: serde_json::from_str(&payload_json).unwrap_or(json!({})),
+            card_key: row.get(7)?,
+            card_title: row.get(8)?,
         })
     }
 

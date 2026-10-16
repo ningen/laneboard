@@ -43,6 +43,18 @@ export interface Event {
   payload: unknown;
 }
 
+export interface ActivityItem {
+  id: number;
+  at: string;
+  actor_kind: string;
+  actor_name: string | null;
+  card_id: string | null;
+  card_key: string | null;
+  card_title: string | null;
+  kind: string;
+  payload: unknown;
+}
+
 export interface CardDetail {
   card: Card;
   links: Array<{

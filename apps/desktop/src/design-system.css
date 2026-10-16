@@ -84,6 +84,8 @@
 
   --topbar-h: 52px;
   --drawer-w: 22rem;
+  --feed-w: 17.5rem;
+  --feed-collapsed-w: 2.25rem;
 }
 
 @media (prefers-color-scheme: dark) {

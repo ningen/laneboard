@@ -1,8 +1,11 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ActivityFeed } from "./ActivityFeed";
 import { api } from "./api";
+import { notifyActivity } from "./notify";
 import { SettingsModal } from "./SettingsModal";
 import {
+  ActivityItem,
   BoardSnapshot,
   Card,
   CardDetail,
@@ -14,10 +17,14 @@ import {
 
 type DetailTab = "properties" | "activity";
 
+const LIVE_POLL_MS = 1500;
+const FEED_STORAGE_KEY = "laneboard.activityFeedOpen";
+
 export default function App() {
   const [board, setBoard] = useState<BoardSnapshot | null>(null);
   const [selected, setSelected] = useState<CardDetail | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [query, setQuery] = useState("");
   const [dbPath, setDbPath] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +35,20 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>("properties");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [feedOpen, setFeedOpen] = useState(() => {
+    try {
+      const raw = localStorage.getItem(FEED_STORAGE_KEY);
+      return raw == null ? true : raw === "1";
+    } catch {
+      return true;
+    }
+  });
+  const [live, setLive] = useState(true);
+  const lastEventId = useRef(0);
+  const selectedRef = useRef(selected);
+  const queryRef = useRef(query);
+  selectedRef.current = selected;
+  queryRef.current = query;
 
   const refresh = useCallback(async (q?: string) => {
     setError(null);
@@ -43,6 +64,13 @@ export default function App() {
         setBoard(await api<BoardSnapshot>("get_board"));
       }
       setEvents(await api<Event[]>("timeline", { limit: 40 }));
+      const feed = await api<ActivityItem[]>("list_activity", { limit: 50, after_id: 0 });
+      setActivity(feed);
+      if (feed.length > 0) {
+        lastEventId.current = Math.max(lastEventId.current, feed[0].id);
+      } else {
+        lastEventId.current = await api<number>("latest_event_id");
+      }
       setDbPath(await api<string>("db_path"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -54,11 +82,79 @@ export default function App() {
   }, [refresh]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(FEED_STORAGE_KEY, feedOpen ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [feedOpen]);
+
+  useEffect(() => {
     const t = window.setTimeout(() => {
       void refresh(query);
     }, 180);
     return () => window.clearTimeout(t);
   }, [query, refresh]);
+
+  // Live watch: poll event cursor; refresh board + notify on new agent/human events.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      try {
+        const latest = await api<number>("latest_event_id");
+        if (cancelled) return;
+        setLive(true);
+        if (latest <= lastEventId.current) return;
+        const after = lastEventId.current;
+        const fresh = await api<ActivityItem[]>("list_activity", {
+          limit: 40,
+          after_id: after,
+        });
+        if (cancelled) return;
+        lastEventId.current = latest;
+        if (fresh.length === 0) return;
+
+        setActivity((prev) => {
+          const seen = new Set(fresh.map((e) => e.id));
+          return [...fresh, ...prev.filter((e) => !seen.has(e.id))].slice(0, 80);
+        });
+        setEvents(await api<Event[]>("timeline", { limit: 40 }));
+
+        const q = queryRef.current;
+        if (q && q.trim()) {
+          const cards = await api<Card[]>("list_cards", { query: q.trim() });
+          const columns = COLUMNS.map((status) => ({
+            status,
+            cards: cards.filter((c) => c.status === status),
+          }));
+          setBoard({ columns });
+        } else {
+          setBoard(await api<BoardSnapshot>("get_board"));
+        }
+
+        const sel = selectedRef.current;
+        if (sel) {
+          const touched = fresh.some(
+            (e) => e.card_id === sel.card.id || e.card_key === sel.card.key,
+          );
+          if (touched) {
+            setSelected(await api<CardDetail>("get_card", { id: sel.card.id }));
+          }
+        }
+
+        await notifyActivity(fresh);
+      } catch {
+        if (!cancelled) setLive(false);
+      }
+    };
+    const id = window.setInterval(() => {
+      void tick();
+    }, LIVE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -78,6 +174,10 @@ export default function App() {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") {
         e.preventDefault();
         setSettingsOpen(true);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "\\") {
+        e.preventDefault();
+        setFeedOpen((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -143,7 +243,9 @@ export default function App() {
   }
 
   return (
-    <div className={`app${drawerOpen ? " drawer-open" : ""}`}>
+    <div
+      className={`app${drawerOpen ? " drawer-open" : ""}${feedOpen ? " feed-open" : ""}`}
+    >
       <header className="topbar">
         <div className="brand">
           <span className="brand-mark" aria-hidden />
@@ -171,9 +273,24 @@ export default function App() {
         </div>
 
         <div className="top-actions">
+          <span
+            className={`live-status${live ? " on" : ""}`}
+            title={live ? "Live updates on" : "Live updates paused"}
+          >
+            <span className="live-dot" aria-hidden />
+            {live ? "Live" : "Offline"}
+          </span>
           <span className="board-meta" title={dbPath || undefined}>
             {visibleCount} issue{visibleCount === 1 ? "" : "s"}
           </span>
+          <button
+            className="btn ghost"
+            type="button"
+            title="Toggle activity feed (⌘\\)"
+            onClick={() => setFeedOpen((v) => !v)}
+          >
+            Activity
+          </button>
           <button className="btn ghost" type="button" onClick={() => void refresh(query)}>
             Refresh
           </button>
@@ -212,6 +329,13 @@ export default function App() {
         )}
 
         <div className="main">
+        <ActivityFeed
+          items={activity}
+          open={feedOpen}
+          live={live}
+          onToggle={() => setFeedOpen((v) => !v)}
+          onOpenCard={(id) => void openCard(id)}
+        />
         <section className="board" aria-label="Kanban board">
           {board?.columns.map((col) => (
             <div
@@ -426,19 +550,10 @@ export default function App() {
                     </section>
                     <section className="props-block">
                       <h4>Board activity</h4>
-                      {events.length === 0 ? (
-                        <p className="empty">No board events yet.</p>
-                      ) : (
-                        events.slice(0, 16).map((ev) => (
-                          <div key={ev.id} className="event">
-                            <time dateTime={ev.at}>{formatWhen(ev.at)}</time>
-                            <span>
-                              {ev.kind}
-                              {ev.card_id ? ` · ${ev.card_id.slice(0, 8)}…` : ""}
-                            </span>
-                          </div>
-                        ))
-                      )}
+                      <p className="empty muted">
+                        Full feed is in the Activity panel
+                        {events.length > 0 ? ` · ${events.length} recent events` : ""}.
+                      </p>
                     </section>
                   </>
                 )}
