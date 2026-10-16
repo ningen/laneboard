@@ -91,6 +91,15 @@ let events = [
 
 const COLUMNS = ["backlog", "ready", "doing", "blocked", "done"];
 
+let gitlabSettings = {
+  base_url: "https://gitlab.com",
+  token_set: false,
+  project: "",
+  open_status: "ready",
+  label: "",
+  state: "opened",
+};
+
 function board() {
   return {
     columns: COLUMNS.map((status) => ({
@@ -159,7 +168,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204, {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     });
     res.end();
@@ -167,7 +176,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   let body = "";
-  if (req.method === "POST" || req.method === "PATCH") {
+  if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
     for await (const chunk of req) body += chunk;
   }
   const parsed = body ? JSON.parse(body) : {};
@@ -240,6 +249,46 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === "/api/seed" && req.method === "POST") {
     return json(res, 200, { ok: true });
+  }
+  if (pathname === "/api/settings/gitlab" && req.method === "GET") {
+    return json(res, 200, gitlabSettings);
+  }
+  if (pathname === "/api/settings/gitlab" && req.method === "PUT") {
+    if (parsed.base_url != null) gitlabSettings.base_url = parsed.base_url;
+    if (parsed.project != null) gitlabSettings.project = parsed.project;
+    if (parsed.open_status != null) gitlabSettings.open_status = parsed.open_status;
+    if (parsed.label != null) gitlabSettings.label = parsed.label;
+    if (parsed.state != null) gitlabSettings.state = parsed.state;
+    if (parsed.token && String(parsed.token).trim()) gitlabSettings.token_set = true;
+    return json(res, 200, gitlabSettings);
+  }
+  if (pathname === "/api/gitlab/doctor" && req.method === "POST") {
+    if (!gitlabSettings.token_set) {
+      return json(res, 400, { error: "GitLab token not set (Settings or GITLAB_TOKEN)" });
+    }
+    return json(res, 200, {
+      ok: true,
+      base_url: gitlabSettings.base_url,
+      user: { id: 1, username: "mock", name: "Mock User" },
+    });
+  }
+  if (
+    (pathname === "/api/gitlab/import" || pathname === "/api/gitlab/sync") &&
+    req.method === "POST"
+  ) {
+    if (!gitlabSettings.project) {
+      return json(res, 400, { error: "GitLab project not set" });
+    }
+    if (!gitlabSettings.token_set) {
+      return json(res, 400, { error: "GitLab token not set (Settings or GITLAB_TOKEN)" });
+    }
+    return json(res, 200, {
+      project: gitlabSettings.project,
+      created: pathname.endsWith("import") ? 1 : 0,
+      updated: pathname.endsWith("sync") ? 1 : 0,
+      unchanged: 0,
+      items: [],
+    });
   }
 
   return serveStatic(req, res);

@@ -76,6 +76,25 @@ export async function api<T>(
     }
     case "db_path":
       return http("/api/db-path");
+    case "get_gitlab_settings":
+      return http("/api/settings/gitlab");
+    case "save_gitlab_settings":
+      return http("/api/settings/gitlab", {
+        method: "PUT",
+        body: JSON.stringify(args?.input ?? {}),
+      });
+    case "gitlab_doctor":
+      return http("/api/gitlab/doctor", { method: "POST", body: "{}" });
+    case "gitlab_import":
+      return http("/api/gitlab/import", {
+        method: "POST",
+        body: JSON.stringify(args?.input ?? {}),
+      });
+    case "gitlab_sync":
+      return http("/api/gitlab/sync", {
+        method: "POST",
+        body: JSON.stringify(args?.input ?? {}),
+      });
     default:
       throw new Error(`Unknown API command: ${cmd}`);
   }

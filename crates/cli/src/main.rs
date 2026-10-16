@@ -580,8 +580,12 @@ fn main() -> Result<()> {
         }
         Commands::Gitlab { command } => match command {
             GitlabCmd::Doctor => {
-                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
-                let info = gitlab::doctor(&client)?;
+                let info = gitlab::doctor_from_settings(&store)
+                    .or_else(|_| {
+                        let client =
+                            gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                        gitlab::doctor(&client)
+                    })?;
                 print_out(&cli.json, &info, || {
                     println!(
                         "ok  {}  @{}",
@@ -599,7 +603,10 @@ fn main() -> Result<()> {
                 dry_run,
                 actor_name,
             } => {
-                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                let settings = store.gitlab_settings()?;
+                let client = gitlab::GitLabClient::new(settings.to_client_config().or_else(|_| {
+                    gitlab::GitLabConfig::from_env()
+                })?);
                 let report = gitlab::import_issues(
                     &store,
                     &client,
@@ -635,7 +642,10 @@ fn main() -> Result<()> {
                 dry_run,
                 actor_name,
             } => {
-                let client = gitlab::GitLabClient::new(gitlab::GitLabConfig::from_env()?);
+                let settings = store.gitlab_settings()?;
+                let client = gitlab::GitLabClient::new(settings.to_client_config().or_else(|_| {
+                    gitlab::GitLabConfig::from_env()
+                })?);
                 let report = gitlab::sync_linked(
                     &store,
                     &client,

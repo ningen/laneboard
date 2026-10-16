@@ -71,3 +71,35 @@ export const COLUMN_LABELS: Record<Status, string> = {
   blocked: "Blocked",
   done: "Done",
 };
+
+export interface GitLabSettingsView {
+  base_url: string;
+  token_set: boolean;
+  project: string;
+  open_status: string;
+  label: string;
+  state: string;
+}
+
+export interface GitLabSettingsUpdate {
+  base_url?: string;
+  token?: string;
+  project?: string;
+  open_status?: string;
+  label?: string;
+  state?: string;
+}
+
+export interface SyncReport {
+  project: string;
+  created: number;
+  updated: number;
+  unchanged: number;
+  items: Array<{
+    action: string;
+    issue_iid: number;
+    web_url: string;
+    card_key: string | null;
+    title: string;
+  }>;
+}

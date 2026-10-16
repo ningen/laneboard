@@ -5,13 +5,16 @@ One-way **pull** of GitLab Issues into Laneboard cards. No webhooks, no cloud sy
 ## Setup
 
 1. Create a GitLab [Personal Access Token](https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html) with `read_api`.
-2. Export:
+2. **Desktop / `board ui`:** open **Settings** (⌘,) → GitLab → host, token, `group/project` → Save. Use **Test connection**, **Import issues**, or **Sync linked**.
+3. **CLI env (optional fallback):**
 
 ```bash
 export GITLAB_TOKEN=glpat-…
 # self-managed / Dedicated:
 # export GITLAB_URL=https://gitlab.example.com
 ```
+
+Settings are stored in the board SQLite `meta` table (`gitlab_settings`). The UI never re-reads the raw token after save (`token_set` only).
 
 ## Commands
 

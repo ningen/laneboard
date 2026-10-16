@@ -8,7 +8,7 @@ use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use board_core::{
-    AssigneeKind, BoardStore, CreateCard, Status, UpdateCard,
+    gitlab, AssigneeKind, BoardStore, CreateCard, GitLabSettingsUpdate, Status, UpdateCard,
 };
 use rust_embed::Embed;
 use serde::Deserialize;
@@ -42,6 +42,13 @@ pub async fn run(db: Option<std::path::PathBuf>, host: &str, port: u16) -> Resul
         .route("/api/seed", post(seed_demo))
         .route("/api/timeline", get(timeline))
         .route("/api/db-path", get(db_path))
+        .route(
+            "/api/settings/gitlab",
+            get(get_gitlab_settings).put(save_gitlab_settings),
+        )
+        .route("/api/gitlab/doctor", post(gitlab_doctor))
+        .route("/api/gitlab/import", post(gitlab_import))
+        .route("/api/gitlab/sync", post(gitlab_sync))
         .fallback(static_handler)
         .layer(CorsLayer::permissive())
         .with_state(state);
@@ -243,6 +250,58 @@ async fn timeline(
 async fn db_path(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
     let _store = lock(&state)?;
     Ok(Json(BoardStore::path_hint().display().to_string()))
+}
+
+async fn get_gitlab_settings(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let view = store
+        .gitlab_settings_view()
+        .map_err(ApiError::from_board)?;
+    Ok(Json(view))
+}
+
+async fn save_gitlab_settings(
+    State(state): State<AppState>,
+    Json(input): Json<GitLabSettingsUpdate>,
+) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let view = store
+        .save_gitlab_settings(input)
+        .map_err(ApiError::from_board)?;
+    Ok(Json(view))
+}
+
+async fn gitlab_doctor(State(state): State<AppState>) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let info = gitlab::doctor_from_settings(&store).map_err(ApiError::from_board)?;
+    Ok(Json(info))
+}
+
+#[derive(Deserialize)]
+struct GitlabRunBody {
+    dry_run: Option<bool>,
+}
+
+async fn gitlab_import(
+    State(state): State<AppState>,
+    Json(input): Json<GitlabRunBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let report = gitlab::import_from_settings(&store, input.dry_run.unwrap_or(false))
+        .map_err(ApiError::from_board)?;
+    Ok(Json(report))
+}
+
+async fn gitlab_sync(
+    State(state): State<AppState>,
+    Json(input): Json<GitlabRunBody>,
+) -> Result<impl IntoResponse, ApiError> {
+    let store = lock(&state)?;
+    let report = gitlab::sync_from_settings(&store, input.dry_run.unwrap_or(false))
+        .map_err(ApiError::from_board)?;
+    Ok(Json(report))
 }
 
 async fn static_handler(uri: Uri) -> Response {

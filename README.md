@@ -78,10 +78,14 @@ Windows CLI (prebuilt): [`dist/board-windows-x64.exe`](dist/board-windows-x64.ex
 
 ## GitLab
 
-Pull GitLab Issues into the board (local SQLite; no webhooks):
+Pull GitLab Issues into the board (local SQLite; no webhooks).
+
+**UI:** Desktop / `board ui` → **Settings** (⌘,) → GitLab (token, project, import / sync).
+
+**CLI:**
 
 ```bash
-export GITLAB_TOKEN=glpat-…          # read_api
+export GITLAB_TOKEN=glpat-…          # read_api (or save token in Settings)
 # export GITLAB_URL=https://gitlab.example.com   # self-managed
 board gitlab doctor
 board gitlab import group/project
